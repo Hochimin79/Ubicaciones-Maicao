@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mapa Colaborativo</title>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+
+  <script>
+    // Tu configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyChCMjaGLCwp7HHLHPMTSVP1RA8n-zp8j0",
+      authDomain: "etiquetas-54790.firebaseapp.com",
+      projectId: "etiquetas-54790",
+      storageBucket: "etiquetas-54790.firebasestorage.app",
+      messagingSenderId: "381423809074",
+      appId: "1:381423809074:web:96f53ea2b4da712ea1022b",
+      measurementId: "G-BGJP69WQLE",
+      databaseURL: "https://etiquetas-54790-default-rtdb.firebaseio.com"
+    };
+
+    // Inicializar Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+const auth = firebase.auth();
+
+let user = null;
+let esAdmin = false;
+
+// Iniciar sesión automática con Google
+auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
+  .then((result) => {
+    user = result.user;
+    console.log("Usuario logueado:", user.email, user.uid);
+
+    // Cambia esto por tu UID real de administrador
+    const uidAdmin = "lzBFfSACJYchLQHnhjpAkKBqema2";
+    if (user.uid === uidAdmin) {
+      esAdmin = true;
+      alert("Bienvenido, administrador");
+    }
+  });
+    // Inicializa el mapa
+    const map = L.map('map').setView([11.3796, -72.2418], 13); // Maicao
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Escucha clics del usuario
+    map.on('click', function(e) {
+  const lat = e.latlng.lat;
+  const lng = e.latlng.lng;
+
+  const contenedor = document.createElement('div');
+  contenedor.innerHTML = `
+    <label>Etiqueta:<br><input type="text" id="etiquetaTexto"></label><br>
+    <label>Categoría:<br>
+      <select id="etiquetaCategoria">
+        <option value="camara">Cámara</option>
+        <option value="alarma">Alarma</option>
+        <option value="wifi">Punto WiFi</option>
+        <option value="otro">Otro</option>
+      </select>
+    </label><br><br>
+    <button onclick="guardarEtiqueta(${lat}, ${lng})">Guardar</button>
+  `;
+
+  L.popup()
+    .setLatLng(e.latlng)
+    .setContent(contenedor)
+    .openOn(map);
+});
+
+function guardarEtiqueta(lat, lng) {
+  const texto = document.getElementById('etiquetaTexto').value;
+  const categoria = document.getElementById('etiquetaCategoria').value;
+
+  if (texto) {
+    database.ref('etiquetas').push({
+      lat: lat,
+      lng: lng,
+      texto: texto,
+      categoria: categoria
+    });
+    map.closePopup();
+  } else {
+    alert("Escribe una etiqueta.");
+  }
+}
+
+const marcadores = {};
+
+function getIconoPorCategoria(cat) {
+  const colores = {
+    camara: 'blue',
+    alarma: 'red',
+    wifi: 'green',
+    otro: 'gray'
+  };
+  return L.icon({
+    iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/marker-icon-${colores[cat] || 'gray'}.png`,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-shadow.png',
+    shadowSize: [41, 41]
+  });
+}
+
+const marcadores = {};
+
+database.ref('etiquetas').on('child_added', function(snapshot) {
+  const data = snapshot.val();
+  const id = snapshot.key;
+
+  const popupHtml = esAdmin
+    ? `<b>${data.texto}</b><br><button onclick="eliminarEtiqueta('${id}')">Eliminar</button>`
+    : `<b>${data.texto}</b>`;
+
+  const marcador = L.marker([data.lat, data.lng]).addTo(map)
+    .bindPopup(popupHtml);
+
+  marcadores[id] = marcador;
+});
+
+    // Cargar etiquetas desde Firebase en tiempo real
+    database.ref('etiquetas').on('child_added', function(snapshot) {
+      const data = snapshot.val();
+      L.marker([data.lat, data.lng]).addTo(map)
+        .bindPopup(data.texto);
+    });
+  </script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+</body>
+</html>
